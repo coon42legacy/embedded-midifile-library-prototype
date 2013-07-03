@@ -29,50 +29,8 @@
 #endif
 #include "midifile.h"
 
-/*
-** Internal Data Structures
-*/
-typedef struct 	{
-				BYTE note, chn;
-				BYTE valid, p2;
-				DWORD end_pos;
-				} MIDI_LAST_NOTE;
 
-typedef struct 	{
-				BYTE *ptr;
-				BYTE *pBase;
-				BYTE *pEnd;
-				
-				DWORD pos;
-				DWORD dt;
-				/* For Reading MIDI Files */
-				DWORD sz;						/* size of whole iTrack */
-				/* For Writing MIDI Files */
-				DWORD iBlockSize;				/* max size of track */
-				BYTE iDefaultChannel;			/* use for write only */
-				BYTE last_status;				/* used for running status */
-				
-				MIDI_LAST_NOTE LastNote[MAX_TRACK_POLYPHONY];
-				} MIDI_FILE_TRACK;
 
-typedef struct 	{
-				DWORD	iHeaderSize;
-				/**/
-				WORD	iVersion;		/* 0, 1 or 2 */
-				WORD	iNumTracks;		/* number of tracks... (will be 1 for MIDI type 0) */
-				WORD	PPQN;			/* pulses per quarter note */
-				} MIDI_HEADER;
-
-typedef struct {
-				FILE				*pFile;
-				BOOL				bOpenForWriting;
-				
-				MIDI_HEADER			Header;
-				BYTE *ptr;			/* to whole data block */
-				DWORD file_sz;
-				
-				MIDI_FILE_TRACK		Track[MAX_MIDI_TRACKS];
-				} _MIDI_FILE;
 
 
 /*
@@ -239,7 +197,9 @@ int length = ppqn;
 /*
 ** midiFile* Functions
 */
-MIDI_FILE  *midiFileCreate(const char *pFilename, BOOL bOverwriteIfExists)
+
+/*
+_MIDI_FILE  *midiFileCreate(const char *pFilename, BOOL bOverwriteIfExists)
 {
 _MIDI_FILE *pMF = (_MIDI_FILE *)malloc(sizeof(_MIDI_FILE));
 int i;
@@ -257,7 +217,7 @@ int i;
 		}
 	
 	if ((pMF->pFile = fopen(pFilename, "wb+")))
-		{/*empty*/}
+		{} //empty
 	else
 		{
 		free((void *)pMF);
@@ -281,10 +241,11 @@ int i;
 		memset(pMF->Track[i].LastNote, '\0', sizeof(pMF->Track[i].LastNote));
 		}
 	
-	return (MIDI_FILE *)pMF;
+	return (_MIDI_FILE *)pMF;
 }
+*/
 
-int		midiFileSetTracksDefaultChannel(MIDI_FILE *_pMF, int iTrack, int iChannel)
+int		midiFileSetTracksDefaultChannel(_MIDI_FILE *_pMF, int iTrack, int iChannel)
 {
 int prev;
 
@@ -301,7 +262,7 @@ int prev;
 	return prev;
 }
 
-int		midiFileGetTracksDefaultChannel(const MIDI_FILE *_pMF, int iTrack)
+int		midiFileGetTracksDefaultChannel(const _MIDI_FILE *_pMF, int iTrack)
 {
 	_VAR_CAST;
 	if (!IsFilePtrValid(pMF))				return 0;
@@ -310,7 +271,7 @@ int		midiFileGetTracksDefaultChannel(const MIDI_FILE *_pMF, int iTrack)
 	return pMF->Track[iTrack].iDefaultChannel+1;
 }
 
-int		midiFileSetPPQN(MIDI_FILE *_pMF, int PPQN)
+int		midiFileSetPPQN(_MIDI_FILE *_pMF, int PPQN)
 {
 int prev;
 
@@ -321,14 +282,14 @@ int prev;
 	return prev;
 }
 
-int		midiFileGetPPQN(const MIDI_FILE *_pMF)
+int		midiFileGetPPQN(const _MIDI_FILE *_pMF)
 {
 	_VAR_CAST;
 	if (!IsFilePtrValid(pMF))				return MIDI_PPQN_DEFAULT;
 	return (int)pMF->Header.PPQN;
 }
 
-int		midiFileSetVersion(MIDI_FILE *_pMF, int iVersion)
+int		midiFileSetVersion(_MIDI_FILE *_pMF, int iVersion)
 {
 int prev;
 
@@ -340,40 +301,34 @@ int prev;
 	return prev;
 }
 
-int			midiFileGetVersion(const MIDI_FILE *_pMF)
+int			midiFileGetVersion(const _MIDI_FILE *_pMF)
 {
 	_VAR_CAST;
 	if (!IsFilePtrValid(pMF))				return MIDI_VERSION_DEFAULT;
 	return pMF->Header.iVersion;
 }
 
-MIDI_FILE  *midiFileOpen(const char *pFilename)
+
+
+void midiFileOpen( _MIDI_FILE* pMF, const char *pFilename, BOOL* open_success )
 {
-FILE *fp = fopen(pFilename, "rb");
-_MIDI_FILE *pMF = NULL;
-BYTE *ptr;
-BOOL bValidFile=FALSE;
-long size;
-int debug_midi_size;
+	FILE *fp = fopen(pFilename, "rb");
+	BYTE *ptr;
+	BOOL bValidFile = FALSE;
+	long size;
 
 	if (fp)
 	{
-		debug_midi_size = sizeof(pMF->Track);
-
-
-		if ((pMF = (_MIDI_FILE *)malloc(sizeof(_MIDI_FILE))))
-		{
 		fseek(fp, 0L, SEEK_END);
 		size = ftell(fp);
 		if ((pMF->ptr = (BYTE *)malloc(size)))
-			{
+		{
 			fseek(fp, 0L, SEEK_SET);
-			fread(pMF->ptr, sizeof(BYTE), size, fp);
+			fread(pMF->ptr, sizeof(BYTE), size, fp); // read whole file and store at pMF->ptr
 			/* Is this a valid MIDI file ? */
 			ptr = pMF->ptr;
-			if (*(ptr+0) == 'M' && *(ptr+1) == 'T' && 
-				*(ptr+2) == 'h' && *(ptr+3) == 'd')
-				{
+			if (*(ptr+0) == 'M' && *(ptr+1) == 'T' &&  *(ptr+2) == 'h' && *(ptr+3) == 'd')
+			{
 				DWORD dwData;
 				WORD wData;
 				int i;
@@ -394,41 +349,35 @@ int debug_midi_size;
 				/*
 				**	 Get all tracks
 				*/
-				for(i=0;i<MAX_MIDI_TRACKS;++i)
-					{
+				for(i=0; i < MAX_MIDI_TRACKS; ++i)
+				{
 					pMF->Track[i].pos = 0;
 					pMF->Track[i].last_status = 0;
-					}
+				}
 					
-				for(i=0;i<pMF->Header.iNumTracks;++i)
-					{
+				for(i=0; i < (pMF->Header.iNumTracks < MAX_MIDI_TRACKS ? pMF->Header.iNumTracks : MAX_MIDI_TRACKS); ++i)
+				{
 					pMF->Track[i].pBase = ptr;
 					pMF->Track[i].ptr = ptr+8;
 					dwData = *((DWORD *)(ptr+4));
-					pMF->Track[i].sz = SWAP_DWORD(dwData);
-					pMF->Track[i].pEnd = ptr+pMF->Track[i].sz+8;
-					ptr += pMF->Track[i].sz+8;
-					}
+					pMF->Track[i].size = SWAP_DWORD(dwData);
+					pMF->Track[i].pEnd = ptr+pMF->Track[i].size+8;
+					ptr += pMF->Track[i].size+8;
+				}
 						   
 				pMF->bOpenForWriting = FALSE;
 				pMF->pFile = NULL;
 				bValidFile = TRUE;
-				}
 			}
 		}
-
-	fclose(fp);
+		
+		fclose(fp);
 	}
 	
 	if (!bValidFile)
-	{
-		if (pMF)		
-			free((void *)pMF);
-
-		return NULL;
-	}
-	
-	return (MIDI_FILE *)pMF;
+		*open_success = FALSE;
+	else
+		*open_success = TRUE;
 }
 
 typedef struct {
@@ -444,7 +393,7 @@ MIDI_END_POINT *p2 = (MIDI_END_POINT *)e2;
 	return p1->iEndPos-p2->iEndPos;
 }
 
-BOOL	midiFileFlushTrack(MIDI_FILE *_pMF, int iTrack, BOOL bFlushToEnd, DWORD dwEndTimePos)
+BOOL	midiFileFlushTrack(_MIDI_FILE *_pMF, int iTrack, BOOL bFlushToEnd, DWORD dwEndTimePos)
 {
 int sz;
 BYTE *ptr;
@@ -517,7 +466,7 @@ BOOL bNoChanges = TRUE;
 	return TRUE;
 }
 
-BOOL	midiFileSyncTracks(MIDI_FILE *_pMF, int iTrack1, int iTrack2)
+BOOL	midiFileSyncTracks(_MIDI_FILE *_pMF, int iTrack1, int iTrack2)
 {
 int p1, p2;
 
@@ -536,7 +485,7 @@ int p1, p2;
 }
 
 
-BOOL	midiFileClose(MIDI_FILE *_pMF)
+BOOL	midiFileClose(_MIDI_FILE *_pMF)
 {
 	_VAR_CAST;
 	if (!IsFilePtrValid(pMF))			return FALSE;
@@ -621,7 +570,7 @@ BOOL	midiFileClose(MIDI_FILE *_pMF)
 /*
 ** midiSong* Functions
 */
-BOOL	midiSongAddSMPTEOffset(MIDI_FILE *_pMF, int iTrack, int iHours, int iMins, int iSecs, int iFrames, int iFFrames)
+BOOL	midiSongAddSMPTEOffset(_MIDI_FILE *_pMF, int iTrack, int iHours, int iMins, int iSecs, int iFrames, int iFFrames)
 {
 static BYTE tmp[] = {msgMetaEvent, metaSMPTEOffset, 0x05, 0,0,0,0,0};
 
@@ -642,12 +591,12 @@ static BYTE tmp[] = {msgMetaEvent, metaSMPTEOffset, 0x05, 0,0,0,0,0};
 }
 
 
-BOOL	midiSongAddSimpleTimeSig(MIDI_FILE *_pMF, int iTrack, int iNom, int iDenom)
+BOOL	midiSongAddSimpleTimeSig(_MIDI_FILE *_pMF, int iTrack, int iNom, int iDenom)
 {
 	return midiSongAddTimeSig(_pMF, iTrack, iNom, iDenom, 24, 8);
 }
 
-BOOL	midiSongAddTimeSig(MIDI_FILE *_pMF, int iTrack, int iNom, int iDenom, int iClockInMetroTick, int iNotated32nds)
+BOOL	midiSongAddTimeSig(_MIDI_FILE *_pMF, int iTrack, int iNom, int iDenom, int iClockInMetroTick, int iNotated32nds)
 {
 static BYTE tmp[] = {msgMetaEvent, metaTimeSig, 0x04, 0,0,0,0};
 
@@ -662,7 +611,7 @@ static BYTE tmp[] = {msgMetaEvent, metaTimeSig, 0x04, 0,0,0,0};
 	return midiTrackAddRaw(pMF, iTrack, sizeof(tmp), tmp, FALSE, 0);
 }
 
-BOOL	midiSongAddKeySig(MIDI_FILE *_pMF, int iTrack, tMIDI_KEYSIG iKey)
+BOOL	midiSongAddKeySig(_MIDI_FILE *_pMF, int iTrack, tMIDI_KEYSIG iKey)
 {
 static BYTE tmp[] = {msgMetaEvent, metaKeySig, 0x02, 0, 0};
 
@@ -675,7 +624,7 @@ static BYTE tmp[] = {msgMetaEvent, metaKeySig, 0x02, 0, 0};
 	return midiTrackAddRaw(pMF, iTrack, sizeof(tmp), tmp, FALSE, 0);
 }
 
-BOOL	midiSongAddTempo(MIDI_FILE *_pMF, int iTrack, int iTempo)
+BOOL	midiSongAddTempo(_MIDI_FILE *_pMF, int iTrack, int iTempo)
 {
 static BYTE tmp[] = {msgMetaEvent, metaSetTempo, 0x03, 0,0,0};
 int us;	/* micro-seconds per qn */
@@ -691,7 +640,7 @@ int us;	/* micro-seconds per qn */
 	return midiTrackAddRaw(pMF, iTrack, sizeof(tmp), tmp, FALSE, 0);
 }
 
-BOOL	midiSongAddMIDIPort(MIDI_FILE *_pMF, int iTrack, int iPort)
+BOOL	midiSongAddMIDIPort(_MIDI_FILE *_pMF, int iTrack, int iPort)
 {
 static BYTE tmp[] = {msgMetaEvent, metaMIDIPort, 1, 0};
 
@@ -702,7 +651,7 @@ static BYTE tmp[] = {msgMetaEvent, metaMIDIPort, 1, 0};
 	return midiTrackAddRaw(pMF, iTrack, sizeof(tmp), tmp, FALSE, 0);
 }
 
-BOOL	midiSongAddEndSequence(MIDI_FILE *_pMF, int iTrack)
+BOOL	midiSongAddEndSequence(_MIDI_FILE *_pMF, int iTrack)
 {
 static BYTE tmp[] = {msgMetaEvent, metaEndSequence, 0};
 
@@ -717,7 +666,7 @@ static BYTE tmp[] = {msgMetaEvent, metaEndSequence, 0};
 /*
 ** midiTrack* Functions
 */
-BOOL	midiTrackAddRaw(MIDI_FILE *_pMF, int iTrack, int data_sz, const BYTE *pData, BOOL bMovePtr, int dt)
+BOOL	midiTrackAddRaw(_MIDI_FILE *_pMF, int iTrack, int data_sz, const BYTE *pData, BOOL bMovePtr, int dt)
 {
 MIDI_FILE_TRACK *pTrk;
 BYTE *ptr;
@@ -747,7 +696,7 @@ int dtime;
 }
 
 
-BOOL	midiTrackIncTime(MIDI_FILE *_pMF, int iTrack, int iDeltaTime, BOOL bOverridePPQN)
+BOOL	midiTrackIncTime(_MIDI_FILE *_pMF, int iTrack, int iDeltaTime, BOOL bOverridePPQN)
 {
 DWORD will_end_at;
 
@@ -763,7 +712,7 @@ DWORD will_end_at;
 	return TRUE;
 }
 
-BOOL	midiTrackAddText(MIDI_FILE *_pMF, int iTrack, tMIDI_TEXT iType, const char *pTxt)
+BOOL	midiTrackAddText(_MIDI_FILE *_pMF, int iTrack, tMIDI_TEXT iType, const char *pTxt)
 {
 BYTE *ptr;
 int sz;
@@ -789,27 +738,27 @@ int sz;
 		}
 }
 
-BOOL	midiTrackSetKeyPressure(MIDI_FILE *pMF, int iTrack, int iNote, int iAftertouch)
+BOOL	midiTrackSetKeyPressure(_MIDI_FILE *pMF, int iTrack, int iNote, int iAftertouch)
 {
 	return midiTrackAddMsg(pMF, iTrack, msgNoteKeyPressure, iNote, iAftertouch);
 }
 
-BOOL	midiTrackAddControlChange(MIDI_FILE *pMF, int iTrack, tMIDI_CC iCCType, int iParam)
+BOOL	midiTrackAddControlChange(_MIDI_FILE *pMF, int iTrack, tMIDI_CC iCCType, int iParam)
 {
 	return midiTrackAddMsg(pMF, iTrack, msgControlChange, iCCType, iParam);
 }
 
-BOOL	midiTrackAddProgramChange(MIDI_FILE *pMF, int iTrack, int iInstrPatch)
+BOOL	midiTrackAddProgramChange(_MIDI_FILE *pMF, int iTrack, int iInstrPatch)
 {
 	return midiTrackAddMsg(pMF, iTrack, msgSetProgram, iInstrPatch, 0);
 }
 
-BOOL	midiTrackChangeKeyPressure(MIDI_FILE *pMF, int iTrack, int iDeltaPressure)
+BOOL	midiTrackChangeKeyPressure(_MIDI_FILE *pMF, int iTrack, int iDeltaPressure)
 {
 	return midiTrackAddMsg(pMF, iTrack, msgChangePressure, iDeltaPressure&0x7f, 0);
 }
 
-BOOL	midiTrackSetPitchWheel(MIDI_FILE *pMF, int iTrack, int iWheelPos)
+BOOL	midiTrackSetPitchWheel(_MIDI_FILE *pMF, int iTrack, int iWheelPos)
 {
 WORD wheel = (WORD)iWheelPos;
 
@@ -818,7 +767,7 @@ WORD wheel = (WORD)iWheelPos;
 	return midiTrackAddMsg(pMF, iTrack, msgSetPitchWheel, wheel&0x7f, (wheel>>7)&0x7f);
 }
 
-BOOL	midiTrackAddMsg(MIDI_FILE *_pMF, int iTrack, tMIDI_MSG iMsg, int iParam1, int iParam2)
+BOOL	midiTrackAddMsg(_MIDI_FILE *_pMF, int iTrack, tMIDI_MSG iMsg, int iParam1, int iParam2)
 {
 BYTE *ptr;
 BYTE data[3];
@@ -855,7 +804,7 @@ int sz;
 
 }
 
-BOOL	midiTrackAddNote(MIDI_FILE *_pMF, int iTrack, int iNote, int iLength, int iVol, BOOL bAutoInc, BOOL bOverrideLength)
+BOOL	midiTrackAddNote(_MIDI_FILE *_pMF, int iTrack, int iNote, int iLength, int iVol, BOOL bAutoInc, BOOL bOverrideLength)
 {
 MIDI_FILE_TRACK *pTrk;
 BYTE *ptr;
@@ -905,7 +854,7 @@ int i, chn;
 	return TRUE;
 }
 
-BOOL	midiTrackAddRest(MIDI_FILE *_pMF, int iTrack, int iLength, BOOL bOverridePPQN)
+BOOL	midiTrackAddRest(_MIDI_FILE *_pMF, int iTrack, int iLength, BOOL bOverridePPQN)
 {
 	_VAR_CAST;
 	if (!IsFilePtrValid(pMF))				return FALSE;
@@ -915,7 +864,7 @@ BOOL	midiTrackAddRest(MIDI_FILE *_pMF, int iTrack, int iLength, BOOL bOverridePP
 	return midiTrackIncTime(pMF, iTrack, iLength, bOverridePPQN);
 }
 
-int		midiTrackGetEndPos(MIDI_FILE *_pMF, int iTrack)
+int		midiTrackGetEndPos(_MIDI_FILE *_pMF, int iTrack)
 {
 	_VAR_CAST;
 	if (!IsFilePtrValid(pMF))				return FALSE;
@@ -962,20 +911,21 @@ static BOOL _midiReadTrackCopyData(MIDI_MSG *pMsg, BYTE *ptr, DWORD sz, BOOL bCo
 	return TRUE;
 }
 
-int midiReadGetNumTracks(const MIDI_FILE *_pMF)
+int midiReadGetNumTracks(const _MIDI_FILE *_pMF)
 {
 	_VAR_CAST;
 	return pMF->Header.iNumTracks;
 }
 
-BOOL midiReadGetNextMessage(const MIDI_FILE *_pMF, int iTrack, MIDI_MSG *pMsg)
+BOOL midiReadGetNextMessage(const _MIDI_FILE *_pMF, int iTrack, MIDI_MSG *pMsg)
 {
-MIDI_FILE_TRACK *pTrack;
-BYTE *bptr, *pMsgDataPtr;
-int sz;
+	MIDI_FILE_TRACK *pTrack;
+	BYTE *bptr, *pMsgDataPtr;
+	int sz;
 
 	_VAR_CAST;
-	if (!IsTrackValid(iTrack))			return FALSE;
+	if (!IsTrackValid(iTrack))			
+		return FALSE;
 	
 	pTrack = &pMF->Track[iTrack];
 	/* FIXME: Check if there is data on this track first!!!	*/
@@ -988,7 +938,7 @@ int sz;
 	pMsg->dwAbsPos = pTrack->pos;
 
 	if (*pTrack->ptr & 0x80)	/* Is this is sys message */
-		{
+	{
 		pMsg->iType = (tMIDI_MSG)((*pTrack->ptr) & 0xf0);
 		pMsgDataPtr = pTrack->ptr+1;
 
@@ -996,177 +946,179 @@ int sz;
 		** important in their lower bits that we must keep */
 		if (pMsg->iType == 0xf0)
 			pMsg->iType = (tMIDI_MSG)(*pTrack->ptr);
-		}
+	}
 	else						/* just data - so use the last msg type */
-		{
+	{
 		pMsg->iType = pMsg->iLastMsgType;
 		pMsgDataPtr = pTrack->ptr;
-		}
+	}
 	
 	pMsg->iLastMsgType = (tMIDI_MSG)pMsg->iType;
 	pMsg->iLastMsgChnl = (BYTE)((*pTrack->ptr) & 0x0f)+1;
 
 	switch(pMsg->iType)
-		{
-		case	msgNoteOn:
-							pMsg->MsgData.NoteOn.iChannel = pMsg->iLastMsgChnl;
-							pMsg->MsgData.NoteOn.iNote = *(pMsgDataPtr);
-							pMsg->MsgData.NoteOn.iVolume = *(pMsgDataPtr+1);
-							pMsg->iMsgSize = 3;
-							break;
+	{
+	case	msgNoteOn:
+		pMsg->MsgData.NoteOn.iChannel = pMsg->iLastMsgChnl;
+		pMsg->MsgData.NoteOn.iNote = *(pMsgDataPtr);
+		pMsg->MsgData.NoteOn.iVolume = *(pMsgDataPtr+1);
+		pMsg->iMsgSize = 3;
+		break;
 
-		case	msgNoteOff:
-							pMsg->MsgData.NoteOff.iChannel = pMsg->iLastMsgChnl;
-							pMsg->MsgData.NoteOff.iNote = *(pMsgDataPtr);
-							pMsg->iMsgSize = 3;
-							break;
+	case	msgNoteOff:
+		pMsg->MsgData.NoteOff.iChannel = pMsg->iLastMsgChnl;
+		pMsg->MsgData.NoteOff.iNote = *(pMsgDataPtr);
+		pMsg->iMsgSize = 3;
+		break;
 
-		case	msgNoteKeyPressure:
-							pMsg->MsgData.NoteKeyPressure.iChannel = pMsg->iLastMsgChnl;
-							pMsg->MsgData.NoteKeyPressure.iNote = *(pMsgDataPtr);
-							pMsg->MsgData.NoteKeyPressure.iPressure = *(pMsgDataPtr+1);
-							pMsg->iMsgSize = 3;
-							break;
+	case	msgNoteKeyPressure:
+		pMsg->MsgData.NoteKeyPressure.iChannel = pMsg->iLastMsgChnl;
+		pMsg->MsgData.NoteKeyPressure.iNote = *(pMsgDataPtr);
+		pMsg->MsgData.NoteKeyPressure.iPressure = *(pMsgDataPtr+1);
+		pMsg->iMsgSize = 3;
+		break;
 
-		case	msgSetParameter:
-							pMsg->MsgData.NoteParameter.iChannel = pMsg->iLastMsgChnl;
-							pMsg->MsgData.NoteParameter.iControl = (tMIDI_CC)*(pMsgDataPtr);
-							pMsg->MsgData.NoteParameter.iParam = *(pMsgDataPtr+1);
-							pMsg->iMsgSize = 3;
-							break;
+	case	msgSetParameter:
+		pMsg->MsgData.NoteParameter.iChannel = pMsg->iLastMsgChnl;
+		pMsg->MsgData.NoteParameter.iControl = (tMIDI_CC)*(pMsgDataPtr);
+		pMsg->MsgData.NoteParameter.iParam = *(pMsgDataPtr+1);
+		pMsg->iMsgSize = 3;
+		break;
 
-		case	msgSetProgram:
-							pMsg->MsgData.ChangeProgram.iChannel = pMsg->iLastMsgChnl;
-							pMsg->MsgData.ChangeProgram.iProgram = *(pMsgDataPtr);
-							pMsg->iMsgSize = 2;
-							break;
+	case	msgSetProgram:
+		pMsg->MsgData.ChangeProgram.iChannel = pMsg->iLastMsgChnl;
+		pMsg->MsgData.ChangeProgram.iProgram = *(pMsgDataPtr);
+		pMsg->iMsgSize = 2;
+		break;
 
-		case	msgChangePressure:
-							pMsg->MsgData.ChangePressure.iChannel = pMsg->iLastMsgChnl;
-							pMsg->MsgData.ChangePressure.iPressure = *(pMsgDataPtr);
-							pMsg->iMsgSize = 2;
-							break;
+	case	msgChangePressure:
+		pMsg->MsgData.ChangePressure.iChannel = pMsg->iLastMsgChnl;
+		pMsg->MsgData.ChangePressure.iPressure = *(pMsgDataPtr);
+		pMsg->iMsgSize = 2;
+		break;
 
-		case	msgSetPitchWheel:
-							pMsg->MsgData.PitchWheel.iChannel = pMsg->iLastMsgChnl;
-							pMsg->MsgData.PitchWheel.iPitch = *(pMsgDataPtr) | (*(pMsgDataPtr+1) << 7);
-							pMsg->MsgData.PitchWheel.iPitch -= MIDI_WHEEL_CENTRE;
-							pMsg->iMsgSize = 3;
-							break;
+	case	msgSetPitchWheel:
+		pMsg->MsgData.PitchWheel.iChannel = pMsg->iLastMsgChnl;
+		pMsg->MsgData.PitchWheel.iPitch = *(pMsgDataPtr) | (*(pMsgDataPtr+1) << 7);
+		pMsg->MsgData.PitchWheel.iPitch -= MIDI_WHEEL_CENTRE;
+		pMsg->iMsgSize = 3;
+		break;
 
-		case	msgMetaEvent:
-							/* We can use 'pTrack->ptr' from now on, since meta events
-							** always have bit 7 set */
-							bptr = pTrack->ptr;
-							pMsg->MsgData.MetaEvent.iType = (tMIDI_META)*(pTrack->ptr+1);
-							pTrack->ptr = _midiReadVarLen(pTrack->ptr+2, &pMsg->iMsgSize);
-							sz = (pTrack->ptr-bptr)+pMsg->iMsgSize;
+	case	msgMetaEvent:
+		/* We can use 'pTrack->ptr' from now on, since meta events
+		** always have bit 7 set */
+		bptr = pTrack->ptr;
+		pMsg->MsgData.MetaEvent.iType = (tMIDI_META)*(pTrack->ptr+1);
+		pTrack->ptr = _midiReadVarLen(pTrack->ptr+2, &pMsg->iMsgSize);
+		sz = (pTrack->ptr-bptr)+pMsg->iMsgSize;
 							
-							if (_midiReadTrackCopyData(pMsg, pTrack->ptr, sz, FALSE) == FALSE)
-								return FALSE;
+		if (_midiReadTrackCopyData(pMsg, pTrack->ptr, sz, FALSE) == FALSE)
+			return FALSE;
 
-							/* Now copy the data...*/
-							memcpy(pMsg->data, bptr, sz);
+		/* Now copy the data...*/
+		memcpy(pMsg->data, bptr, sz);
 
-							/* Now place it in a neat structure */
-							switch(pMsg->MsgData.MetaEvent.iType)
-								{
-								case	metaMIDIPort:
-										pMsg->MsgData.MetaEvent.Data.iMIDIPort = *(pTrack->ptr+0);
-										break;
-								case	metaSequenceNumber:
-										pMsg->MsgData.MetaEvent.Data.iSequenceNumber = *(pTrack->ptr+0);
-										break;
-								case	metaTextEvent:
-								case	metaCopyright:
-								case	metaTrackName:
-								case	metaInstrument:
-								case	metaLyric:
-								case	metaMarker:
-								case	metaCuePoint:
-										/* TODO - Add NULL terminator ??? */
-										pMsg->MsgData.MetaEvent.Data.Text.pData = pTrack->ptr;
-										break;
-								case	metaEndSequence:
-										/* NO DATA */
-										break;
-								case	metaSetTempo:
-										{
-										DWORD us = ((*(pTrack->ptr+0))<<16)|((*(pTrack->ptr+1))<<8)|(*(pTrack->ptr+2));
-										pMsg->MsgData.MetaEvent.Data.Tempo.iBPM = 60000000L/us;
-										}
-										break;
-								case	metaSMPTEOffset:
-										pMsg->MsgData.MetaEvent.Data.SMPTE.iHours = *(pTrack->ptr+0);
-										pMsg->MsgData.MetaEvent.Data.SMPTE.iMins= *(pTrack->ptr+1);
-										pMsg->MsgData.MetaEvent.Data.SMPTE.iSecs = *(pTrack->ptr+2);
-										pMsg->MsgData.MetaEvent.Data.SMPTE.iFrames = *(pTrack->ptr+3);
-										pMsg->MsgData.MetaEvent.Data.SMPTE.iFF = *(pTrack->ptr+4);
-										break;
-								case	metaTimeSig:
-										pMsg->MsgData.MetaEvent.Data.TimeSig.iNom = *(pTrack->ptr+0);
-										pMsg->MsgData.MetaEvent.Data.TimeSig.iDenom = *(pTrack->ptr+1) * MIDI_NOTE_MINIM;
-										/* TODO: Variations without 24 & 8 */
-										break;
-								case	metaKeySig:
-										if (*pTrack->ptr & 0x80)
-											{
-											/* Do some trendy sign extending in reverse :) */
-											pMsg->MsgData.MetaEvent.Data.KeySig.iKey = ((256-*pTrack->ptr)&keyMaskKey);
-											pMsg->MsgData.MetaEvent.Data.KeySig.iKey |= keyMaskNeg;
-											}
-										else
-											{
-											pMsg->MsgData.MetaEvent.Data.KeySig.iKey = (tMIDI_KEYSIG)(*pTrack->ptr&keyMaskKey);
-											}
-										if (*(pTrack->ptr+1)) 
-											pMsg->MsgData.MetaEvent.Data.KeySig.iKey |= keyMaskMin;
-										break;
-								case	metaSequencerSpecific:
-										pMsg->MsgData.MetaEvent.Data.Sequencer.iSize = pMsg->iMsgSize;
-										pMsg->MsgData.MetaEvent.Data.Sequencer.pData = pTrack->ptr;
-										break;
-								}
+		/* Now place it in a neat structure */
+		switch(pMsg->MsgData.MetaEvent.iType)
+			{
+			case	metaMIDIPort:
+					pMsg->MsgData.MetaEvent.Data.iMIDIPort = *(pTrack->ptr+0);
+					break;
+			case	metaSequenceNumber:
+					pMsg->MsgData.MetaEvent.Data.iSequenceNumber = *(pTrack->ptr+0);
+					break;
+			case	metaTextEvent:
+			case	metaCopyright:
+			case	metaTrackName:
+			case	metaInstrument:
+			case	metaLyric:
+			case	metaMarker:
+			case	metaCuePoint:
+					/* TODO - Add NULL terminator ??? */
+					pMsg->MsgData.MetaEvent.Data.Text.pData = pTrack->ptr;
+					break;
+			case	metaEndSequence:
+					/* NO DATA */
+					break;
+			case	metaSetTempo:
+					{
+					DWORD us = ((*(pTrack->ptr+0))<<16)|((*(pTrack->ptr+1))<<8)|(*(pTrack->ptr+2));
+					pMsg->MsgData.MetaEvent.Data.Tempo.iBPM = 60000000L/us;
+					}
+					break;
+			case	metaSMPTEOffset:
+					pMsg->MsgData.MetaEvent.Data.SMPTE.iHours = *(pTrack->ptr+0);
+					pMsg->MsgData.MetaEvent.Data.SMPTE.iMins= *(pTrack->ptr+1);
+					pMsg->MsgData.MetaEvent.Data.SMPTE.iSecs = *(pTrack->ptr+2);
+					pMsg->MsgData.MetaEvent.Data.SMPTE.iFrames = *(pTrack->ptr+3);
+					pMsg->MsgData.MetaEvent.Data.SMPTE.iFF = *(pTrack->ptr+4);
+					break;
+			case	metaTimeSig:
+					pMsg->MsgData.MetaEvent.Data.TimeSig.iNom = *(pTrack->ptr+0);
+					pMsg->MsgData.MetaEvent.Data.TimeSig.iDenom = *(pTrack->ptr+1) * MIDI_NOTE_MINIM;
+					/* TODO: Variations without 24 & 8 */
+					break;
+			case	metaKeySig:
+					if (*pTrack->ptr & 0x80)
+						{
+						/* Do some trendy sign extending in reverse :) */
+						pMsg->MsgData.MetaEvent.Data.KeySig.iKey = ((256-*pTrack->ptr)&keyMaskKey);
+						pMsg->MsgData.MetaEvent.Data.KeySig.iKey |= keyMaskNeg;
+						}
+					else
+						{
+						pMsg->MsgData.MetaEvent.Data.KeySig.iKey = (tMIDI_KEYSIG)(*pTrack->ptr&keyMaskKey);
+						}
+					if (*(pTrack->ptr+1)) 
+						pMsg->MsgData.MetaEvent.Data.KeySig.iKey |= keyMaskMin;
+					break;
+			case	metaSequencerSpecific:
+					pMsg->MsgData.MetaEvent.Data.Sequencer.iSize = pMsg->iMsgSize;
+					pMsg->MsgData.MetaEvent.Data.Sequencer.pData = pTrack->ptr;
+					break;
+			}
 
-							pTrack->ptr += pMsg->iMsgSize;
-							pMsg->iMsgSize = sz;
-							break;
+		pTrack->ptr += pMsg->iMsgSize;
+		pMsg->iMsgSize = sz;
+		break;
 
-		case	msgSysEx1:
-		case	msgSysEx2:
-							bptr = pTrack->ptr;
-							pTrack->ptr = _midiReadVarLen(pTrack->ptr+1, &pMsg->iMsgSize);
-							sz = (pTrack->ptr-bptr)+pMsg->iMsgSize;
+	case	msgSysEx1:
+	case	msgSysEx2:
+		bptr = pTrack->ptr;
+		pTrack->ptr = _midiReadVarLen(pTrack->ptr+1, &pMsg->iMsgSize);
+		sz = (pTrack->ptr-bptr)+pMsg->iMsgSize;
 							
-							if (_midiReadTrackCopyData(pMsg, pTrack->ptr, sz, FALSE) == FALSE)
-								return FALSE;
+		if (_midiReadTrackCopyData(pMsg, pTrack->ptr, sz, FALSE) == FALSE)
+			return FALSE;
 
-							/* Now copy the data... */
-							memcpy(pMsg->data, bptr, sz);
-							pTrack->ptr += pMsg->iMsgSize;
-							pMsg->iMsgSize = sz;
-							pMsg->MsgData.SysEx.pData = pMsg->data;
-							pMsg->MsgData.SysEx.iSize = sz;
-							break;
-		}
+		/* Now copy the data... */
+		memcpy(pMsg->data, bptr, sz);
+		pTrack->ptr += pMsg->iMsgSize;
+		pMsg->iMsgSize = sz;
+		pMsg->MsgData.SysEx.pData = pMsg->data;
+		pMsg->MsgData.SysEx.iSize = sz;
+		break;
+	}
 	/*
 	** Standard MIDI messages use a common copy routine
 	*/
 	pMsg->bImpliedMsg = FALSE;
 	if ((pMsg->iType&0xf0) != 0xf0)
-		{
+	{
 		if (*pTrack->ptr & 0x80) 
-			{
-			}
+		{
+		}
 		else 
-			{
+		{
 			pMsg->bImpliedMsg = TRUE;
 			pMsg->iImpliedMsg = pMsg->iLastMsgType;
 			pMsg->iMsgSize--;
-			}
+		}
+
 		_midiReadTrackCopyData(pMsg, pTrack->ptr, pMsg->iMsgSize, TRUE);
 		pTrack->ptr+=pMsg->iMsgSize;
-		}
+	}
+
 	return TRUE;
 }
 

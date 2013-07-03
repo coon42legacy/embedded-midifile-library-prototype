@@ -25,9 +25,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#ifndef  __APPLE__
-#include <malloc.h>
-#endif
 #include "midifile.h"
 #include "midiutil.h"
 
@@ -42,11 +39,14 @@ int i;
 
 void playMidiFile(const char *pFilename)
 {
-	MIDI_FILE *mf = midiFileOpen(pFilename);
+	_MIDI_FILE pMF;
+	BOOL open_success;
 	char str[128];
 	int ev;
 
-	if (mf)
+	midiFileOpen(&pMF, pFilename, &open_success);
+
+	if (open_success)
 	{
 		MIDI_MSG msg;
 		int i, iNum;
@@ -54,7 +54,7 @@ void playMidiFile(const char *pFilename)
 		int any_track_had_data;
 
 		midiReadInitMessage(&msg);
-		iNum = midiReadGetNumTracks(mf);
+		iNum = midiReadGetNumTracks(&pMF);
 
 		
 		any_track_had_data = 1;
@@ -65,7 +65,7 @@ void playMidiFile(const char *pFilename)
 
 			for(i=0;i<iNum;i++)
 			{
-				if(midiReadGetNextMessage(mf, i, &msg))
+				if(midiReadGetNextMessage(&pMF, i, &msg)) // maybe this function will be the hardest part
 				{
 					any_track_had_data = 1;
 
@@ -88,7 +88,9 @@ void playMidiFile(const char *pFilename)
 					printf(" %.6ld ", msg.dwAbsPos);
 
 
-					if (muGetMIDIMsgName(str, ev))	printf("%s\t", str);
+					if (muGetMIDIMsgName(str, ev))	
+						printf("%s\t", str);
+
 					switch(ev)
 					{
 					case	msgNoteOff:
@@ -212,7 +214,6 @@ void playMidiFile(const char *pFilename)
 		}
 
 		midiReadFreeMessage(&msg);
-		midiFileClose(mf);
 	}
 }
 
