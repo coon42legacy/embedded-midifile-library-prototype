@@ -30,7 +30,7 @@
 #include "midifile.h"
 
 
-
+FILE* g_file_ptr;
 
 
 /*
@@ -314,38 +314,60 @@ void midiFileOpen( _MIDI_FILE* pMF, const char *pFilename, BOOL* open_success )
 {
 	FILE *fp = fopen(pFilename, "rb");
 	BYTE *ptr;
+	DWORD ptr2;
 	BOOL bValidFile = FALSE;
 	long size;
+	BYTE tmp[16];
 
-	if (fp)
+	g_file_ptr = fopen(pFilename, "rb");
+
+	//if (fp)
+	if(g_file_ptr)
 	{
+		// get file size
 		fseek(fp, 0L, SEEK_END);
 		size = ftell(fp);
+
 		if ((pMF->ptr = (BYTE *)malloc(size)))
 		{
+			pMF->ptr2 = 0;
+
 			fseek(fp, 0L, SEEK_SET);
 			fread(pMF->ptr, sizeof(BYTE), size, fp); // read whole file and store at pMF->ptr
+
 			/* Is this a valid MIDI file ? */
 			ptr = pMF->ptr;
-			if (*(ptr+0) == 'M' && *(ptr+1) == 'T' &&  *(ptr+2) == 'h' && *(ptr+3) == 'd')
+			ptr2 = pMF->ptr2;
+
+			fread(tmp, 1, 4, g_file_ptr);
+
+			//if (*(ptr+0) == 'M' && *(ptr+1) == 'T' &&  *(ptr+2) == 'h' && *(ptr+3) == 'd')
+			if (tmp[0] == 'M' && tmp[1] == 'T' &&  tmp[2] == 'h' && tmp[3] == 'd')
 			{
 				DWORD dwData;
+				DWORD dwData2;
 				WORD wData;
+				WORD wData2;
 				int i;
 
-				dwData = *((DWORD *)(ptr+4));
+				dwData = *((DWORD *)(ptr + 4));
+				fread(&dwData2, sizeof(DWORD), 1, g_file_ptr);
 				pMF->Header.iHeaderSize = SWAP_DWORD(dwData);
 					
-				wData = *((WORD *)(ptr+8));
+				wData = *((WORD *)(ptr + 8));
+				fread(&wData2, sizeof(WORD), 1, g_file_ptr);
 				pMF->Header.iVersion = (WORD)SWAP_WORD(wData);
 					
-				wData = *((WORD *)(ptr+10));
+				wData = *((WORD *)(ptr + 10));
+				fread(&wData2, sizeof(WORD), 1, g_file_ptr);
 				pMF->Header.iNumTracks = (WORD)SWAP_WORD(wData);
 					
-				wData = *((WORD *)(ptr+12));
+				wData = *((WORD *)(ptr + 12));
+				fread(&wData2, sizeof(WORD), 1, g_file_ptr);
 				pMF->Header.PPQN = (WORD)SWAP_WORD(wData);
 					
-				ptr += pMF->Header.iHeaderSize+8;
+				ptr  += pMF->Header.iHeaderSize + 8;
+				ptr2 += pMF->Header.iHeaderSize + 8;
 				/*
 				**	 Get all tracks
 				*/
@@ -358,11 +380,18 @@ void midiFileOpen( _MIDI_FILE* pMF, const char *pFilename, BOOL* open_success )
 				for(i=0; i < (pMF->Header.iNumTracks < MAX_MIDI_TRACKS ? pMF->Header.iNumTracks : MAX_MIDI_TRACKS); ++i)
 				{
 					pMF->Track[i].pBase = ptr;
-					pMF->Track[i].ptr = ptr+8;
-					dwData = *((DWORD *)(ptr+4));
+					pMF->Track[i].pBase2 = ptr2;
+					pMF->Track[i].ptr = ptr + 8;
+					pMF->Track[i].ptr2 = ptr2 + 8;
+					dwData = *((DWORD *)(ptr + 4));
+					fseek(g_file_ptr, ptr2 + 4, SEEK_SET);
+					fread(&dwData2, sizeof(DWORD), 1, g_file_ptr);
+
 					pMF->Track[i].size = SWAP_DWORD(dwData);
-					pMF->Track[i].pEnd = ptr+pMF->Track[i].size+8;
-					ptr += pMF->Track[i].size+8;
+					pMF->Track[i].pEnd = ptr + pMF->Track[i].size + 8;
+					pMF->Track[i].pEnd2 = ptr2 + pMF->Track->size + 8;
+					ptr += pMF->Track[i].size + 8;
+					ptr2 += pMF->Track[i].size + 8;
 				}
 						   
 				pMF->bOpenForWriting = FALSE;

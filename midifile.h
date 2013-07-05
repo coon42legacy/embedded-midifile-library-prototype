@@ -89,6 +89,11 @@ typedef struct 	{
 	BYTE *pBase;
 	BYTE *pEnd;
 
+	DWORD ptr2;
+	DWORD pBase2;
+	DWORD pEnd2;
+
+
 	DWORD pos;
 	DWORD dt;
 	/* For Reading MIDI Files */
@@ -115,6 +120,7 @@ typedef struct {
 
 	MIDI_HEADER			Header;
 	BYTE *ptr;			/* to whole data block */
+	DWORD ptr2;
 	DWORD file_sz;
 
 	MIDI_FILE_TRACK		Track[MAX_MIDI_TRACKS];
