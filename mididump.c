@@ -214,6 +214,9 @@ void playMidiFile(const char *pFilename)
 
 		midiReadFreeMessage(&msg);
 	}
+
+	// wait for user input before close
+	getch();
 }
 
 /*

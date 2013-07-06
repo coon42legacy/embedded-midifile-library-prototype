@@ -367,8 +367,8 @@ void midiFileOpen( _MIDI_FILE* pMF, const char *pFilename, BOOL* open_success )
 		{
 			pMF->ptr2 = 0;
 
-			fseek(fp, 0L, SEEK_SET);
-			fread(pMF->ptr, sizeof(BYTE), size, fp); // read whole file and store at pMF->ptr
+			fseek(fp, 0L, SEEK_SET); // delete
+			fread(pMF->ptr, sizeof(BYTE), size, fp); // read whole file and store at pMF->ptr // delete
 
 			ptr = pFileBase = pMF->ptr;
 			ptr2 = pMF->ptr2;
@@ -387,21 +387,25 @@ void midiFileOpen( _MIDI_FILE* pMF, const char *pFilename, BOOL* open_success )
 				WORD wData2;
 				int i;
 
-				dwData = *((DWORD *)(ptr + 4));
-				fread(&dwData2, sizeof(DWORD), 1, g_file_ptr);
-				pMF->Header.iHeaderSize = SWAP_DWORD(dwData);
+				dwData = *((DWORD *)(ptr + 4)); // delete
+				dwData2 = read_dword_value_from_pos(ptr2 + 4);
+				pMF->Header.iHeaderSize = SWAP_DWORD(dwData); // delete
+				pMF->Header.iHeaderSize = SWAP_DWORD(dwData2);
+
+				wData = *((WORD *)(ptr + 8)); // delete
+				wData2 = read_word_value_from_pos(ptr2 + 8);
+				pMF->Header.iVersion = (WORD)SWAP_WORD(wData); // delete
+				pMF->Header.iVersion = (WORD)SWAP_WORD(wData2);
 					
-				wData = *((WORD *)(ptr + 8));
-				fread(&wData2, sizeof(WORD), 1, g_file_ptr);
-				pMF->Header.iVersion = (WORD)SWAP_WORD(wData);
+				wData = *((WORD *)(ptr + 10)); // delete
+				wData2 = wData2 = read_word_value_from_pos(ptr2 + 10);
+				pMF->Header.iNumTracks = (WORD)SWAP_WORD(wData); // delete
+				pMF->Header.iNumTracks = (WORD)SWAP_WORD(wData2);
 					
-				wData = *((WORD *)(ptr + 10));
-				fread(&wData2, sizeof(WORD), 1, g_file_ptr);
-				pMF->Header.iNumTracks = (WORD)SWAP_WORD(wData);
-					
-				wData = *((WORD *)(ptr + 12));
-				fread(&wData2, sizeof(WORD), 1, g_file_ptr);
-				pMF->Header.PPQN = (WORD)SWAP_WORD(wData);
+				wData = *((WORD *)(ptr + 12)); // delete
+				wData2 = read_word_value_from_pos(ptr2 + 12);
+				pMF->Header.PPQN = (WORD)SWAP_WORD(wData); // delete
+				pMF->Header.PPQN = (WORD)SWAP_WORD(wData2);
 					
 				ptr  += pMF->Header.iHeaderSize + 8;
 				ptr2 += pMF->Header.iHeaderSize + 8;
@@ -424,9 +428,9 @@ void midiFileOpen( _MIDI_FILE* pMF, const char *pFilename, BOOL* open_success )
 					dwData2 = read_dword_value_from_pos(ptr2 + 4);
 
 					pMF->Track[i].size = SWAP_DWORD(dwData);
-					pMF->Track[i].pEnd = ptr + pMF->Track[i].size + 8;
-					pMF->Track[i].pEnd2 = ptr2 + pMF->Track->size + 8;
-					ptr += pMF->Track[i].size + 8;
+					pMF->Track[i].pEnd  = ptr  + pMF->Track[i].size + 8; // delete
+					pMF->Track[i].pEnd2 = ptr2 + pMF->Track[i].size + 8;
+					ptr  += pMF->Track[i].size + 8; // delete
 					ptr2 += pMF->Track[i].size + 8;
 				}
 						   
@@ -1045,9 +1049,12 @@ BOOL midiReadGetNextMessage(const _MIDI_FILE *_pMF, int iTrack, MIDI_MSG *pMsg)
 	pTrack = &pMF->Track[iTrack];
 
 	/* FIXME: Check if there is data on this track first!!!	*/
-	//if (pTrack->ptr >= pTrack->pEnd)
+	if (pTrack->ptr >= pTrack->pEnd) // delete
+		return FALSE; // delete
+
 	if (pTrack->ptr2 >= pTrack->pEnd2)
 		return FALSE;
+	
 	
 	
 	pTrack->ptr = _midiReadVarLen(pTrack->ptr, &pMsg->dt); // delete
@@ -1176,8 +1183,8 @@ BOOL midiReadGetNextMessage(const _MIDI_FILE *_pMF, int iTrack, MIDI_MSG *pMsg)
 		sz = (pTrack->ptr2 - bptr2) + pMsg->iMsgSize;
 
 
-		if (_midiReadTrackCopyData(pMsg, pTrack->ptr, sz, FALSE) == FALSE) // delete
-			return FALSE; // delete
+		//if (_midiReadTrackCopyData(pMsg, pTrack->ptr, sz, FALSE) == FALSE) // delete
+		//	return FALSE; // delete
 
 		if (_midiReadTrackCopyData2(pMsg, pTrack->ptr2, sz, FALSE) == FALSE)
 			return FALSE;
