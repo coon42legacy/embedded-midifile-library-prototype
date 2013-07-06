@@ -38,32 +38,26 @@ void read_mem_from_pos(void* dst, DWORD pos, DWORD length)
 	fread(dst, 1, length, g_file_ptr);
 }
 
-DWORD read_dword_value_from_pos(DWORD pos, DWORD length)
+DWORD read_dword_value_from_pos(DWORD pos)
 {
 	DWORD ret = 0;
-
-	fseek(g_file_ptr, pos, SEEK_SET);
-	fread(&ret, 1, length, g_file_ptr);
+	read_mem_from_pos(&ret, pos, sizeof(DWORD));
 
 	return ret;
 }
 
-WORD read_word_value_from_pos(DWORD pos, DWORD length)
+WORD read_word_value_from_pos(DWORD pos)
 {
 	WORD ret = 0;
-
-	fseek(g_file_ptr, pos, SEEK_SET);
-	fread(&ret, 1, length, g_file_ptr);
+	read_mem_from_pos(&ret, pos, sizeof(WORD));
 
 	return ret;
 }
 
-BYTE read_byte_value_from_pos(DWORD pos, DWORD length)
+BYTE read_byte_value_from_pos(DWORD pos)
 {
 	BYTE ret = 0;
-
-	fseek(g_file_ptr, pos, SEEK_SET);
-	fread(&ret, 1, length, g_file_ptr);
+	read_mem_from_pos(&ret, pos, sizeof(BYTE));
 
 	return ret;
 }
@@ -425,7 +419,7 @@ void midiFileOpen( _MIDI_FILE* pMF, const char *pFilename, BOOL* open_success )
 					pMF->Track[i].ptr = ptr + 8;
 					pMF->Track[i].ptr2 = ptr2 + 8;
 					dwData = *((DWORD *)(ptr + 4));
-					read_value_from_pos(&dwData2, ptr2 + 4, sizeof(DWORD));
+					dwData2 = read_dword_value_from_pos(ptr2 + 4);
 
 					pMF->Track[i].size = SWAP_DWORD(dwData);
 					pMF->Track[i].pEnd = ptr + pMF->Track[i].size + 8;
@@ -965,17 +959,16 @@ static BYTE *_midiReadVarLen(BYTE *ptr, DWORD *num)
 
 static DWORD _midiReadVarLen2(DWORD ptr2, DWORD *num)
 {
-	DWORD value = 0;
-	BYTE c = 0;
+	register DWORD value = read_byte_value_from_pos(ptr2++);
+	register BYTE c;
 
-	read_value_from_pos(&value, ptr2++, 1);
-
+	
 	if(value & 0x80)
 	{
 		value &= 0x7f;
 		do
 		{
-			read_value_from_pos(&c, ptr2++, 1);
+			c = read_byte_value_from_pos(ptr2++);
 
 			value = (value << 7) + (c & 0x7f);
 		} 
@@ -1044,57 +1037,49 @@ BOOL midiReadGetNextMessage(const _MIDI_FILE *_pMF, int iTrack, MIDI_MSG *pMsg)
 	pMsg->dwAbsPos = pTrack->pos;
 
 	//if (*pTrack->ptr & 0x80)	/* Is this is sys message */
-	read_value_from_pos(&tmp[0], pTrack->ptr2, 1);
+	bTmp[0] = read_byte_value_from_pos(pTrack->ptr2);
 
-	if(tmp[0] & 0x80)
+	if(bTmp[0] & 0x80)
 	{
 		pMsg->iType = (tMIDI_MSG)((*pTrack->ptr) & 0xf0); // delete
-
-		read_value_from_pos(&tmp[0], pTrack->ptr2, 1);
-		pMsg->iType = (tMIDI_MSG)(tmp[0] & 0xf0);
+		pMsg->iType = (tMIDI_MSG)(bTmp[0] & 0xf0);
 
 		pMsgDataPtr = pTrack->ptr + 1; // delete
-
-		read_value_from_pos(&tmp[0], pTrack->ptr2 + 1, 1);
-		pMsgDataPtr2 = tmp[0];
+		pMsgDataPtr2 = read_dword_value_from_pos(pTrack->ptr2 + 1);
 
 		/* SysEx & Meta events don't carry channel info, but something
 		** important in their lower bits that we must keep */
 		if (pMsg->iType == 0xf0)
 		{
 			pMsg->iType = (tMIDI_MSG)(*pTrack->ptr); // delete
-
-			read_value_from_pos(&tmp[0], pTrack->ptr2, 1);
-			pMsg->iType = (tMIDI_MSG)tmp[0];
+			pMsg->iType = (tMIDI_MSG)read_byte_value_from_pos(pTrack->ptr2);
 		}
 	}
 	else						/* just data - so use the last msg type */
 	{
 		pMsg->iType = pMsg->iLastMsgType;
 		pMsgDataPtr = pTrack->ptr; // delete
-
-		read_value_from_pos(&tmp[0], pTrack->ptr2, 1);
-		pMsgDataPtr2 = tmp[0];
+		pMsgDataPtr2 = read_dword_value_from_pos(pTrack->ptr2);
 	}
 	
 	pMsg->iLastMsgType = (tMIDI_MSG)pMsg->iType;
 	pMsg->iLastMsgChnl = (BYTE)((*pTrack->ptr) & 0x0f) + 1; // delete
 
-	read_value_from_pos(&tmp[0], pTrack->ptr2, 1);
-	pMsg->iLastMsgChnl = (BYTE)(tmp[0] & 0x0f) + 1;
+	bTmp[0] = read_byte_value_from_pos(pTrack->ptr2);
+	pMsg->iLastMsgChnl = (BYTE)(bTmp[0] & 0x0f) + 1;
 
-	read_value_from_pos(&tmp[0], pMsgDataPtr2 + 0, 1);
-	read_value_from_pos(&tmp[1], pMsgDataPtr2 + 1, 1);
-	read_value_from_pos(&tmp[2], pMsgDataPtr2 + 2, 1);
+	bTmp[0] = read_byte_value_from_pos(pMsgDataPtr2 + 0);
+	bTmp[1] = read_byte_value_from_pos(pMsgDataPtr2 + 1);
+	bTmp[2] = read_byte_value_from_pos(pMsgDataPtr2 + 2);
 
 	switch(pMsg->iType)
 	{
 	case	msgNoteOn:
 		pMsg->MsgData.NoteOn.iChannel = pMsg->iLastMsgChnl;
 		pMsg->MsgData.NoteOn.iNote = *(pMsgDataPtr); // delete
-		pMsg->MsgData.NoteOn.iNote = tmp[0];
+		pMsg->MsgData.NoteOn.iNote = bTmp[0];
 		pMsg->MsgData.NoteOn.iVolume = *(pMsgDataPtr + 1); // delete
-		pMsg->MsgData.NoteOn.iVolume = tmp[1];
+		pMsg->MsgData.NoteOn.iVolume = bTmp[1];
 
 		pMsg->iMsgSize = 3;
 		break;
@@ -1102,7 +1087,7 @@ BOOL midiReadGetNextMessage(const _MIDI_FILE *_pMF, int iTrack, MIDI_MSG *pMsg)
 	case	msgNoteOff:
 		pMsg->MsgData.NoteOff.iChannel = pMsg->iLastMsgChnl;
 		pMsg->MsgData.NoteOff.iNote = *(pMsgDataPtr); // delete
-		pMsg->MsgData.NoteOff.iNote = tmp[0];
+		pMsg->MsgData.NoteOff.iNote = bTmp[0];
 
 		pMsg->iMsgSize = 3;
 		break;
@@ -1110,9 +1095,9 @@ BOOL midiReadGetNextMessage(const _MIDI_FILE *_pMF, int iTrack, MIDI_MSG *pMsg)
 	case	msgNoteKeyPressure:
 		pMsg->MsgData.NoteKeyPressure.iChannel = pMsg->iLastMsgChnl;
 		pMsg->MsgData.NoteKeyPressure.iNote = *(pMsgDataPtr); // delete
-		pMsg->MsgData.NoteKeyPressure.iNote = tmp[0];
+		pMsg->MsgData.NoteKeyPressure.iNote = bTmp[0];
 		pMsg->MsgData.NoteKeyPressure.iPressure = *(pMsgDataPtr + 1); // delete
-		pMsg->MsgData.NoteKeyPressure.iPressure = tmp[1];
+		pMsg->MsgData.NoteKeyPressure.iPressure = bTmp[1];
 
 		pMsg->iMsgSize = 3;
 		break;
@@ -1120,30 +1105,30 @@ BOOL midiReadGetNextMessage(const _MIDI_FILE *_pMF, int iTrack, MIDI_MSG *pMsg)
 	case	msgSetParameter:
 		pMsg->MsgData.NoteParameter.iChannel = pMsg->iLastMsgChnl;
 		pMsg->MsgData.NoteParameter.iControl = (tMIDI_CC)*(pMsgDataPtr); // delete
-		pMsg->MsgData.NoteParameter.iControl = (tMIDI_CC)tmp[0]; 
+		pMsg->MsgData.NoteParameter.iControl = (tMIDI_CC)bTmp[0]; 
 		pMsg->MsgData.NoteParameter.iParam = *(pMsgDataPtr + 1); // delete
-		pMsg->MsgData.NoteParameter.iParam = tmp[1];
+		pMsg->MsgData.NoteParameter.iParam = bTmp[1];
 		pMsg->iMsgSize = 3;
 		break;
 
 	case	msgSetProgram:
 		pMsg->MsgData.ChangeProgram.iChannel = pMsg->iLastMsgChnl;
 		pMsg->MsgData.ChangeProgram.iProgram = *(pMsgDataPtr); // delete
-		pMsg->MsgData.ChangeProgram.iProgram = tmp[0];
+		pMsg->MsgData.ChangeProgram.iProgram = bTmp[0];
 		pMsg->iMsgSize = 2;
 		break;
 
 	case	msgChangePressure:
 		pMsg->MsgData.ChangePressure.iChannel = pMsg->iLastMsgChnl;
 		pMsg->MsgData.ChangePressure.iPressure = *(pMsgDataPtr); // delete
-		pMsg->MsgData.ChangePressure.iPressure = tmp[0];
+		pMsg->MsgData.ChangePressure.iPressure = bTmp[0];
 		pMsg->iMsgSize = 2;
 		break;
 
 	case	msgSetPitchWheel:
 		pMsg->MsgData.PitchWheel.iChannel = pMsg->iLastMsgChnl;
 		pMsg->MsgData.PitchWheel.iPitch = *(pMsgDataPtr) | (*(pMsgDataPtr + 1) << 7); // delete
-		pMsg->MsgData.PitchWheel.iPitch = tmp[0] | (tmp[1] << 7);
+		pMsg->MsgData.PitchWheel.iPitch = bTmp[0] | (bTmp[1] << 7);
 		pMsg->MsgData.PitchWheel.iPitch -= MIDI_WHEEL_CENTRE;
 		pMsg->iMsgSize = 3;
 		break;
@@ -1154,18 +1139,23 @@ BOOL midiReadGetNextMessage(const _MIDI_FILE *_pMF, int iTrack, MIDI_MSG *pMsg)
 		bptr = pTrack->ptr; // delete
 		bptr2 = pTrack->ptr2;
 
-		
+		bTmp[0] = read_byte_value_from_pos(pTrack->ptr2 + 0);
+		bTmp[1] = read_byte_value_from_pos(pTrack->ptr2 + 1);
+		bTmp[2] = read_byte_value_from_pos(pTrack->ptr2 + 2);
+		bTmp[3] = read_byte_value_from_pos(pTrack->ptr2 + 3);
+		bTmp[4] = read_byte_value_from_pos(pTrack->ptr2 + 4);
+
 
 		pMsg->MsgData.MetaEvent.iType = (tMIDI_META)*(pTrack->ptr + 1); // delete
-		pMsg->MsgData.MetaEvent.iType = (tMIDI_META)tmp[1];
+		pMsg->MsgData.MetaEvent.iType = (tMIDI_META)bTmp[1];
 
 		pTrack->ptr = _midiReadVarLen(pTrack->ptr + 2, &pMsg->iMsgSize); // delete
 		pTrack->ptr2 = _midiReadVarLen2(pTrack->ptr2 + 2, &pMsg->iMsgSize);
 
 		sz = (pTrack->ptr - bptr) + pMsg->iMsgSize; // delete
 
-		read_value_from_pos(&tmp[10], pTrack->ptr2, sizeof(DWORD));
-		sz = (*(DWORD*)&tmp[10] - bptr2) + pMsg->iMsgSize;
+		dwTmp[0] = read_dword_value_from_pos(pTrack->ptr2);
+		sz = (pTrack->ptr2 - bptr2) + pMsg->iMsgSize;
 
 
 		if (_midiReadTrackCopyData(pMsg, pTrack->ptr, sz, FALSE) == FALSE)
