@@ -985,7 +985,7 @@ static BOOL _midiReadTrackCopyData(MIDI_MSG *pMsg, BYTE *ptr, DWORD sz, BOOL bCo
 {
 	if (sz > pMsg->data_sz)
 	{
-		pMsg->data = (BYTE *)realloc(pMsg->data, sz); // also acts as malloc
+		pMsg->data = (BYTE *)realloc(pMsg->data, sz); // also acts as malloc. can be tolerated since it only allocs a few bytes
 		pMsg->data_sz = sz;
 	}
 	
@@ -995,6 +995,24 @@ static BOOL _midiReadTrackCopyData(MIDI_MSG *pMsg, BYTE *ptr, DWORD sz, BOOL bCo
 	if (bCopyPtrData && ptr)
 		memcpy(pMsg->data, ptr, sz);
 	
+	return TRUE;
+}
+
+static BOOL _midiReadTrackCopyData2(MIDI_MSG *pMsg, DWORD ptr2, DWORD sz, BOOL bCopyPtrData)
+{
+	if (sz > pMsg->data_sz)
+	{
+		pMsg->data = (BYTE *)realloc(pMsg->data, sz); // also acts as malloc. can be tolerated since it only allocs a few bytes
+		pMsg->data_sz = sz;
+	}
+
+	if (!pMsg->data)
+		return FALSE;
+
+	if (bCopyPtrData && read_byte_value_from_pos(ptr2))
+		read_mem_from_pos(pMsg->data, ptr2, sz);
+		//memcpy(pMsg->data, ptr, sz);
+
 	return TRUE;
 }
 
@@ -1158,20 +1176,27 @@ BOOL midiReadGetNextMessage(const _MIDI_FILE *_pMF, int iTrack, MIDI_MSG *pMsg)
 		sz = (pTrack->ptr2 - bptr2) + pMsg->iMsgSize;
 
 
-		if (_midiReadTrackCopyData(pMsg, pTrack->ptr, sz, FALSE) == FALSE)
+		if (_midiReadTrackCopyData(pMsg, pTrack->ptr, sz, FALSE) == FALSE) // delete
+			return FALSE; // delete
+
+		if (_midiReadTrackCopyData2(pMsg, pTrack->ptr2, sz, FALSE) == FALSE)
 			return FALSE;
 
 		/* Now copy the data...*/
-		memcpy(pMsg->data, bptr, sz);
+		memcpy(pMsg->data, bptr, sz); // delete
+		read_mem_from_pos(pMsg->data, bptr2, sz);
 
 		/* Now place it in a neat structure */
 		switch(pMsg->MsgData.MetaEvent.iType)
 			{
 			case	metaMIDIPort:
-					pMsg->MsgData.MetaEvent.Data.iMIDIPort = *(pTrack->ptr+0);
+					pMsg->MsgData.MetaEvent.Data.iMIDIPort = *(pTrack->ptr + 0); // delete
+					pMsg->MsgData.MetaEvent.Data.iMIDIPort = bTmp[0];
+
 					break;
 			case	metaSequenceNumber:
-					pMsg->MsgData.MetaEvent.Data.iSequenceNumber = *(pTrack->ptr+0);
+					pMsg->MsgData.MetaEvent.Data.iSequenceNumber = *(pTrack->ptr + 0); // deöete
+					pMsg->MsgData.MetaEvent.Data.iSequenceNumber = bTmp[0];
 					break;
 			case	metaTextEvent:
 			case	metaCopyright:
@@ -1181,46 +1206,63 @@ BOOL midiReadGetNextMessage(const _MIDI_FILE *_pMF, int iTrack, MIDI_MSG *pMsg)
 			case	metaMarker:
 			case	metaCuePoint:
 					/* TODO - Add NULL terminator ??? */
-					pMsg->MsgData.MetaEvent.Data.Text.pData = pTrack->ptr;
+					pMsg->MsgData.MetaEvent.Data.Text.pData = pTrack->ptr; // delete
+					pMsg->MsgData.MetaEvent.Data.Text.pData = pTrack->ptr2;
 					break;
 			case	metaEndSequence:
 					/* NO DATA */
 					break;
 			case	metaSetTempo:
 					{
-					DWORD us = ((*(pTrack->ptr+0))<<16)|((*(pTrack->ptr+1))<<8)|(*(pTrack->ptr+2));
+					DWORD us = ((*(pTrack->ptr+0))<<16)|((*(pTrack->ptr+1))<<8)|(*(pTrack->ptr+2)); // delete
+						  us = bTmp[0] << 16 | (bTmp[1] << 8 ) | bTmp[2];
 					pMsg->MsgData.MetaEvent.Data.Tempo.iBPM = 60000000L/us;
 					}
 					break;
 			case	metaSMPTEOffset:
-					pMsg->MsgData.MetaEvent.Data.SMPTE.iHours = *(pTrack->ptr+0);
-					pMsg->MsgData.MetaEvent.Data.SMPTE.iMins= *(pTrack->ptr+1);
-					pMsg->MsgData.MetaEvent.Data.SMPTE.iSecs = *(pTrack->ptr+2);
-					pMsg->MsgData.MetaEvent.Data.SMPTE.iFrames = *(pTrack->ptr+3);
-					pMsg->MsgData.MetaEvent.Data.SMPTE.iFF = *(pTrack->ptr+4);
+					pMsg->MsgData.MetaEvent.Data.SMPTE.iHours = *(pTrack->ptr+0); // delete
+					pMsg->MsgData.MetaEvent.Data.SMPTE.iMins= *(pTrack->ptr+1); // delete
+					pMsg->MsgData.MetaEvent.Data.SMPTE.iSecs = *(pTrack->ptr+2); // delete
+					pMsg->MsgData.MetaEvent.Data.SMPTE.iFrames = *(pTrack->ptr+3); // delete
+					pMsg->MsgData.MetaEvent.Data.SMPTE.iFF = *(pTrack->ptr+4); // delete
+
+					pMsg->MsgData.MetaEvent.Data.SMPTE.iHours = bTmp[0];
+					pMsg->MsgData.MetaEvent.Data.SMPTE.iMins= bTmp[1];
+					pMsg->MsgData.MetaEvent.Data.SMPTE.iSecs = bTmp[2];
+					pMsg->MsgData.MetaEvent.Data.SMPTE.iFrames = bTmp[3];
+					pMsg->MsgData.MetaEvent.Data.SMPTE.iFF = bTmp[4];
 					break;
 			case	metaTimeSig:
-					pMsg->MsgData.MetaEvent.Data.TimeSig.iNom = *(pTrack->ptr+0);
-					pMsg->MsgData.MetaEvent.Data.TimeSig.iDenom = *(pTrack->ptr+1) * MIDI_NOTE_MINIM;
+					pMsg->MsgData.MetaEvent.Data.TimeSig.iNom = *(pTrack->ptr+0); // delete
+					pMsg->MsgData.MetaEvent.Data.TimeSig.iDenom = *(pTrack->ptr+1) * MIDI_NOTE_MINIM; //delete
+
+					pMsg->MsgData.MetaEvent.Data.TimeSig.iNom = bTmp[0];
+					pMsg->MsgData.MetaEvent.Data.TimeSig.iDenom = bTmp[1] * MIDI_NOTE_MINIM;
 					/* TODO: Variations without 24 & 8 */
 					break;
 			case	metaKeySig:
-					if (*pTrack->ptr & 0x80)
+					//if (*pTrack->ptr & 0x80)
+					if (bTmp[0] & 0x80)
 						{
 						/* Do some trendy sign extending in reverse :) */
-						pMsg->MsgData.MetaEvent.Data.KeySig.iKey = ((256-*pTrack->ptr)&keyMaskKey);
+						pMsg->MsgData.MetaEvent.Data.KeySig.iKey = ((256-*pTrack->ptr)&keyMaskKey); // delete
+						pMsg->MsgData.MetaEvent.Data.KeySig.iKey |= keyMaskNeg; // delete
+
+						pMsg->MsgData.MetaEvent.Data.KeySig.iKey = ((256 - bTmp[0]) & keyMaskKey); 
 						pMsg->MsgData.MetaEvent.Data.KeySig.iKey |= keyMaskNeg;
 						}
 					else
 						{
-						pMsg->MsgData.MetaEvent.Data.KeySig.iKey = (tMIDI_KEYSIG)(*pTrack->ptr&keyMaskKey);
+						pMsg->MsgData.MetaEvent.Data.KeySig.iKey = (tMIDI_KEYSIG)(*pTrack->ptr & keyMaskKey); // delete
+						pMsg->MsgData.MetaEvent.Data.KeySig.iKey = (tMIDI_KEYSIG)(bTmp[0] & keyMaskKey);
 						}
-					if (*(pTrack->ptr+1)) 
+					if (bTmp[1]) 
 						pMsg->MsgData.MetaEvent.Data.KeySig.iKey |= keyMaskMin;
 					break;
 			case	metaSequencerSpecific:
 					pMsg->MsgData.MetaEvent.Data.Sequencer.iSize = pMsg->iMsgSize;
-					pMsg->MsgData.MetaEvent.Data.Sequencer.pData = pTrack->ptr;
+					pMsg->MsgData.MetaEvent.Data.Sequencer.pData = pTrack->ptr; // delete
+					pMsg->MsgData.MetaEvent.Data.Sequencer.pData = pTrack->ptr2;
 					break;
 			}
 
