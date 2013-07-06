@@ -32,10 +32,40 @@
 FILE* g_file_ptr;
 BYTE *pFileBase;
 
-void read_value_from_pos(void* dst, DWORD pos, DWORD length)
+void read_mem_from_pos(void* dst, DWORD pos, DWORD length)
 {
 	fseek(g_file_ptr, pos, SEEK_SET);
 	fread(dst, 1, length, g_file_ptr);
+}
+
+DWORD read_dword_value_from_pos(DWORD pos, DWORD length)
+{
+	DWORD ret = 0;
+
+	fseek(g_file_ptr, pos, SEEK_SET);
+	fread(&ret, 1, length, g_file_ptr);
+
+	return ret;
+}
+
+WORD read_word_value_from_pos(DWORD pos, DWORD length)
+{
+	WORD ret = 0;
+
+	fseek(g_file_ptr, pos, SEEK_SET);
+	fread(&ret, 1, length, g_file_ptr);
+
+	return ret;
+}
+
+BYTE read_byte_value_from_pos(DWORD pos, DWORD length)
+{
+	BYTE ret = 0;
+
+	fseek(g_file_ptr, pos, SEEK_SET);
+	fread(&ret, 1, length, g_file_ptr);
+
+	return ret;
 }
 
 
@@ -932,37 +962,39 @@ static BYTE *_midiReadVarLen(BYTE *ptr, DWORD *num)
 	return(ptr);
 }
 
+
 static DWORD _midiReadVarLen2(DWORD ptr2, DWORD *num)
 {
-	DWORD value;
-	BYTE c;
+	DWORD value = 0;
+	BYTE c = 0;
 
-	read_value_from_pos(&value, ptr2, 1);
-	ptr2++;
+	read_value_from_pos(&value, ptr2++, 1);
 
-	if (value & 0x80)
+	if(value & 0x80)
 	{
 		value &= 0x7f;
 		do
 		{
-			read_value_from_pos(&c, ptr2, 1);
-			ptr2++;
+			read_value_from_pos(&c, ptr2++, 1);
 
 			value = (value << 7) + (c & 0x7f);
-		} while (c & 0x80);
+		} 
+		while (c & 0x80);
 	}
 	*num = value;
 
-	return(ptr2);
+	return ptr2;
 }
+
+
 
 static BOOL _midiReadTrackCopyData(MIDI_MSG *pMsg, BYTE *ptr, DWORD sz, BOOL bCopyPtrData)
 {
 	if (sz > pMsg->data_sz)
-		{
-		pMsg->data = (BYTE *)realloc(pMsg->data, sz);
+	{
+		pMsg->data = (BYTE *)realloc(pMsg->data, sz); // also acts as malloc
 		pMsg->data_sz = sz;
-		}
+	}
 	
 	if (!pMsg->data)
 		return FALSE;
@@ -987,7 +1019,9 @@ BOOL midiReadGetNextMessage(const _MIDI_FILE *_pMF, int iTrack, MIDI_MSG *pMsg)
 
 	int sz;
 
-	BYTE tmp[16];
+	BYTE bTmp[16];
+	WORD wTmp[16];
+	DWORD dwTmp[16];
 
 	_VAR_CAST;
 
@@ -1118,7 +1152,9 @@ BOOL midiReadGetNextMessage(const _MIDI_FILE *_pMF, int iTrack, MIDI_MSG *pMsg)
 		/* We can use 'pTrack->ptr' from now on, since meta events
 		** always have bit 7 set */
 		bptr = pTrack->ptr; // delete
-		bptr2 = tmp[0];
+		bptr2 = pTrack->ptr2;
+
+		
 
 		pMsg->MsgData.MetaEvent.iType = (tMIDI_META)*(pTrack->ptr + 1); // delete
 		pMsg->MsgData.MetaEvent.iType = (tMIDI_META)tmp[1];
@@ -1126,10 +1162,11 @@ BOOL midiReadGetNextMessage(const _MIDI_FILE *_pMF, int iTrack, MIDI_MSG *pMsg)
 		pTrack->ptr = _midiReadVarLen(pTrack->ptr + 2, &pMsg->iMsgSize); // delete
 		pTrack->ptr2 = _midiReadVarLen2(pTrack->ptr2 + 2, &pMsg->iMsgSize);
 
-		sz = (pTrack->ptr-bptr)+pMsg->iMsgSize;
-			
+		sz = (pTrack->ptr - bptr) + pMsg->iMsgSize; // delete
 
-		//////////////// hier weiter machen!
+		read_value_from_pos(&tmp[10], pTrack->ptr2, sizeof(DWORD));
+		sz = (*(DWORD*)&tmp[10] - bptr2) + pMsg->iMsgSize;
+
 
 		if (_midiReadTrackCopyData(pMsg, pTrack->ptr, sz, FALSE) == FALSE)
 			return FALSE;
