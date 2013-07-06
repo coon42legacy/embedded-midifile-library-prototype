@@ -30,12 +30,11 @@
 
 void HexList(BYTE *pData, int iNumBytes)
 {
-int i;
+	int i;
 
 	for(i=0;i<iNumBytes;i++)
 		printf("%.2x ", pData[i]);
 }
-
 
 void playMidiFile(const char *pFilename)
 {
@@ -63,7 +62,7 @@ void playMidiFile(const char *pFilename)
 		{
 			any_track_had_data = 0;
 
-			for(i=0;i<iNum;i++)
+			for(i=0;i < iNum;i++)
 			{
 				if(midiReadGetNextMessage(&pMF, i, &msg)) // maybe this function will be the hardest part
 				{
@@ -184,7 +183,7 @@ void playMidiFile(const char *pFilename)
 
 						case	metaSequencerSpecific:
 							printf("Sequencer specific = ");
-							HexList(msg.MsgData.MetaEvent.Data.Sequencer.pData, msg.MsgData.MetaEvent.Data.Sequencer.iSize);
+							HexList(msg.MsgData.MetaEvent.Data.Sequencer.pData, msg.MsgData.MetaEvent.Data.Sequencer.iSize); // ok
 							printf("\n");
 							break;
 						}
@@ -193,7 +192,7 @@ void playMidiFile(const char *pFilename)
 					case	msgSysEx1:
 					case	msgSysEx2:
 						printf("Sysex = ");
-						HexList(msg.MsgData.SysEx.pData, msg.MsgData.SysEx.iSize);
+						HexList(msg.MsgData.SysEx.pData, msg.MsgData.SysEx.iSize); // ok
 						break;
 					}
 

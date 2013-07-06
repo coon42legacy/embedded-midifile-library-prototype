@@ -50,6 +50,15 @@ typedef int					BOOL;
 #endif
 
 
+void read_mem_from_pos(void* dst, DWORD pos, DWORD length);
+DWORD read_dword_value_from_pos(DWORD pos);
+WORD read_word_value_from_pos(DWORD pos);
+BYTE read_byte_value_from_pos(DWORD pos);
+
+
+
+
+
 /*
 ** MIDI Constants
 */
@@ -139,7 +148,7 @@ typedef struct {
 					tMIDI_MSG	iImpliedMsg;
 
 					/* Raw data chunk */
-					BYTE *data;		/* dynamic data block */
+					BYTE *data;		/* dynamic data block */ // delete
 					DWORD data_sz;
 					
 					union {
@@ -181,6 +190,7 @@ typedef struct {
 									int					iSequenceNumber;
 									struct {
 										BYTE			*pData;
+										DWORD			pData2;
 										} Text;
 									struct {
 										int				iBPM;
@@ -196,7 +206,8 @@ typedef struct {
 										int				iNom, iDenom;
 										} TimeSig;
 									struct {
-										BYTE			*pData;
+										BYTE			*pData; // delete!
+										DWORD			pData2;
 										int				iSize;
 										} Sequencer;
 									} Data;

@@ -86,18 +86,20 @@ static BOOL _midiValidateTrack(const _MIDI_FILE *pMF, int iTrack)
 	if (!IsFilePtrValid(pMF))	return FALSE;
 	
 	if (pMF->bOpenForWriting)
-		{
+	{
 		if (iTrack < 0 || iTrack >= MAX_MIDI_TRACKS)
 			return FALSE;
-		}
+	}
 	else	/* open for reading */
-		{
-		if (!pMF->ptr)
-			return FALSE;
-		
-		if (iTrack < 0 || iTrack>=pMF->Header.iNumTracks)
-			return FALSE;
-		}
+	{
+	/*
+	if (!pMF->ptr)
+		return FALSE;
+	*/
+
+	if (iTrack < 0 || iTrack>=pMF->Header.iNumTracks)
+		return FALSE;
+	}
 	
 	return TRUE;
 }
@@ -1063,7 +1065,7 @@ BOOL midiReadGetNextMessage(const _MIDI_FILE *_pMF, int iTrack, MIDI_MSG *pMsg)
 		pMsg->iType = (tMIDI_MSG)(bTmp[0] & 0xf0);
 
 		pMsgDataPtr = pTrack->ptr + 1; // delete
-		pMsgDataPtr2 = read_dword_value_from_pos(pTrack->ptr2 + 1);
+		pMsgDataPtr2 = pTrack->ptr2 + 1;
 
 		/* SysEx & Meta events don't carry channel info, but something
 		** important in their lower bits that we must keep */
@@ -1077,7 +1079,7 @@ BOOL midiReadGetNextMessage(const _MIDI_FILE *_pMF, int iTrack, MIDI_MSG *pMsg)
 	{
 		pMsg->iType = pMsg->iLastMsgType;
 		pMsgDataPtr = pTrack->ptr; // delete
-		pMsgDataPtr2 = read_dword_value_from_pos(pTrack->ptr2);
+		pMsgDataPtr2 = pTrack->ptr2;
 	}
 	
 	pMsg->iLastMsgType = (tMIDI_MSG)pMsg->iType;
@@ -1171,8 +1173,6 @@ BOOL midiReadGetNextMessage(const _MIDI_FILE *_pMF, int iTrack, MIDI_MSG *pMsg)
 		pTrack->ptr2 = _midiReadVarLen2(pTrack->ptr2 + 2, &pMsg->iMsgSize);
 
 		sz = (pTrack->ptr - bptr) + pMsg->iMsgSize; // delete
-
-		dwTmp[0] = read_dword_value_from_pos(pTrack->ptr2);
 		sz = (pTrack->ptr2 - bptr2) + pMsg->iMsgSize;
 
 
@@ -1207,7 +1207,7 @@ BOOL midiReadGetNextMessage(const _MIDI_FILE *_pMF, int iTrack, MIDI_MSG *pMsg)
 			case	metaCuePoint:
 					/* TODO - Add NULL terminator ??? */
 					pMsg->MsgData.MetaEvent.Data.Text.pData = pTrack->ptr; // delete
-					pMsg->MsgData.MetaEvent.Data.Text.pData = pTrack->ptr2;
+					pMsg->MsgData.MetaEvent.Data.Text.pData2 = pTrack->ptr2;
 					break;
 			case	metaEndSequence:
 					/* NO DATA */
@@ -1262,28 +1262,42 @@ BOOL midiReadGetNextMessage(const _MIDI_FILE *_pMF, int iTrack, MIDI_MSG *pMsg)
 			case	metaSequencerSpecific:
 					pMsg->MsgData.MetaEvent.Data.Sequencer.iSize = pMsg->iMsgSize;
 					pMsg->MsgData.MetaEvent.Data.Sequencer.pData = pTrack->ptr; // delete
-					pMsg->MsgData.MetaEvent.Data.Sequencer.pData = pTrack->ptr2;
+					pMsg->MsgData.MetaEvent.Data.Sequencer.pData2 = pTrack->ptr2;
 					break;
 			}
 
-		pTrack->ptr += pMsg->iMsgSize;
+		pTrack->ptr += pMsg->iMsgSize; // delete
+		pTrack->ptr2 += pMsg->iMsgSize;
+
 		pMsg->iMsgSize = sz;
 		break;
 
 	case	msgSysEx1:
 	case	msgSysEx2:
-		bptr = pTrack->ptr;
-		pTrack->ptr = _midiReadVarLen(pTrack->ptr+1, &pMsg->iMsgSize);
-		sz = (pTrack->ptr-bptr)+pMsg->iMsgSize;
+		bptr = pTrack->ptr; // delete
+		bptr2 = pTrack->ptr2;
+
+		pTrack->ptr = _midiReadVarLen(pTrack->ptr+1, &pMsg->iMsgSize); // delete
+		pTrack->ptr2 = _midiReadVarLen2(pTrack->ptr2 + 1, &pMsg->iMsgSize);
+
+		sz = (pTrack->ptr - bptr)+pMsg->iMsgSize; // delete
+		sz = (pTrack->ptr2 - bptr2) + pMsg->iMsgSize;
 							
-		if (_midiReadTrackCopyData(pMsg, pTrack->ptr, sz, FALSE) == FALSE)
+		if (_midiReadTrackCopyData(pMsg, pTrack->ptr, sz, FALSE) == FALSE) // delete
+			return FALSE; // delete
+
+		if (_midiReadTrackCopyData2(pMsg, pTrack->ptr2, sz, FALSE) == FALSE)
 			return FALSE;
 
 		/* Now copy the data... */
-		memcpy(pMsg->data, bptr, sz);
-		pTrack->ptr += pMsg->iMsgSize;
+		memcpy(pMsg->data, bptr, sz); // delete
+		read_mem_from_pos(pMsg->data, bptr2, sz);
+
+		pTrack->ptr += pMsg->iMsgSize; // delete
+		pTrack->ptr2 += pMsg->iMsgSize;
+
 		pMsg->iMsgSize = sz;
-		pMsg->MsgData.SysEx.pData = pMsg->data;
+		pMsg->MsgData.SysEx.pData  = pMsg->data; // ok!
 		pMsg->MsgData.SysEx.iSize = sz;
 		break;
 	}
@@ -1291,9 +1305,12 @@ BOOL midiReadGetNextMessage(const _MIDI_FILE *_pMF, int iTrack, MIDI_MSG *pMsg)
 	** Standard MIDI messages use a common copy routine
 	*/
 	pMsg->bImpliedMsg = FALSE;
-	if ((pMsg->iType&0xf0) != 0xf0)
+	if ((pMsg->iType & 0xf0) != 0xf0)
 	{
-		if (*pTrack->ptr & 0x80) 
+		bTmp[0] = read_byte_value_from_pos(pTrack->ptr2);
+
+		//if (*pTrack->ptr & 0x80) 
+		if (bTmp[0] & 0x80) 
 		{
 		}
 		else 
@@ -1303,8 +1320,11 @@ BOOL midiReadGetNextMessage(const _MIDI_FILE *_pMF, int iTrack, MIDI_MSG *pMsg)
 			pMsg->iMsgSize--;
 		}
 
-		_midiReadTrackCopyData(pMsg, pTrack->ptr, pMsg->iMsgSize, TRUE);
-		pTrack->ptr+=pMsg->iMsgSize;
+		_midiReadTrackCopyData(pMsg, pTrack->ptr, pMsg->iMsgSize, TRUE); // delete
+		_midiReadTrackCopyData2(pMsg, pTrack->ptr2, pMsg->iMsgSize, TRUE);
+
+		pTrack->ptr += pMsg->iMsgSize; // delete
+		pTrack->ptr2 += pMsg->iMsgSize;
 	}
 
 	return TRUE;
@@ -1317,6 +1337,7 @@ void midiReadInitMessage(MIDI_MSG *pMsg)
 	pMsg->bImpliedMsg = FALSE;
 }
 
+// ok!
 void midiReadFreeMessage(MIDI_MSG *pMsg)
 {
 	if (pMsg->data)	free((void *)pMsg->data);
