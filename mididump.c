@@ -131,37 +131,35 @@ void playMidiFile(const char *pFilename)
 						case	metaMIDIPort:
 							printf("MIDI Port = %d", msg.MsgData.MetaEvent.Data.iMIDIPort);
 							break;
-
 						case	metaSequenceNumber:
-							printf("Sequence Number = %d",msg.MsgData.MetaEvent.Data.iSequenceNumber);
+							printf("Sequence Number = %d", msg.MsgData.MetaEvent.Data.iSequenceNumber);
 							break;
-
 						case	metaTextEvent:
-							printf("Text = '%s'",msg.MsgData.MetaEvent.Data.Text.pData);
+							printf("Text = '%s'", msg.MsgData.MetaEvent.Data.Text.pData);
 							break;
 						case	metaCopyright:
-							printf("Copyright = '%s'",msg.MsgData.MetaEvent.Data.Text.pData);
+							printf("Copyright = '%s'", msg.MsgData.MetaEvent.Data.Text.pData);
 							break;
 						case	metaTrackName:
-							printf("Track name = '%s'",msg.MsgData.MetaEvent.Data.Text.pData);
+							printf("Track name = '%s'", msg.MsgData.MetaEvent.Data.Text.pData);
 							break;
 						case	metaInstrument:
-							printf("Instrument = '%s'",msg.MsgData.MetaEvent.Data.Text.pData);
+							printf("Instrument = '%s'", msg.MsgData.MetaEvent.Data.Text.pData);
 							break;
 						case	metaLyric:
-							printf("Lyric = '%s'",msg.MsgData.MetaEvent.Data.Text.pData);
+							printf("Lyric = '%s'", msg.MsgData.MetaEvent.Data.Text.pData);
 							break;
 						case	metaMarker:
-							printf("Marker = '%s'",msg.MsgData.MetaEvent.Data.Text.pData);
+							printf("Marker = '%s'", msg.MsgData.MetaEvent.Data.Text.pData);
 							break;
 						case	metaCuePoint:
-							printf("Cue point = '%s'",msg.MsgData.MetaEvent.Data.Text.pData);
+							printf("Cue point = '%s'", msg.MsgData.MetaEvent.Data.Text.pData);
 							break;
 						case	metaEndSequence:
 							printf("End Sequence");
 							break;
 						case	metaSetTempo:
-							printf("Tempo = %d",msg.MsgData.MetaEvent.Data.Tempo.iBPM);
+							printf("Tempo = %d", msg.MsgData.MetaEvent.Data.Tempo.iBPM);
 							break;
 						case	metaSMPTEOffset:
 							printf("SMPTE offset = %d:%d:%d.%d %d",
@@ -173,7 +171,7 @@ void playMidiFile(const char *pFilename)
 								);
 							break;
 						case	metaTimeSig:
-							printf("Time sig = %d/%d",msg.MsgData.MetaEvent.Data.TimeSig.iNom,
+							printf("Time sig = %d/%d", msg.MsgData.MetaEvent.Data.TimeSig.iNom,
 								msg.MsgData.MetaEvent.Data.TimeSig.iDenom/MIDI_NOTE_CROCHET);
 							break;
 						case	metaKeySig:
@@ -183,7 +181,7 @@ void playMidiFile(const char *pFilename)
 
 						case	metaSequencerSpecific:
 							printf("Sequencer specific = ");
-							HexList(msg.MsgData.MetaEvent.Data.Sequencer.pData, msg.MsgData.MetaEvent.Data.Sequencer.iSize); // ok
+							HexList(msg.MsgData.MetaEvent.Data.Sequencer.pData, msg.MsgData.MetaEvent.Data.Sequencer.iSize);
 							printf("\n");
 							break;
 						}
@@ -214,9 +212,11 @@ void playMidiFile(const char *pFilename)
 
 		midiReadFreeMessage(&msg);
 	}
-
-	// wait for user input before close
-	getch();
+	else
+	{
+		printf("Open Failed!\nInvalid MIDI-File Header!\n");
+			
+	}
 }
 
 /*
@@ -394,6 +394,10 @@ int i=0;
 		for(i=1;i<argc;++i)
 			playMidiFile(argv[i]);
 		}
+
+	// wait for user input before close
+	printf("Done! Press enter to exit...\n");
+	getch();
 
 	return 0;
 }

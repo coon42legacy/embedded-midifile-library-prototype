@@ -51,6 +51,7 @@ typedef int					BOOL;
 
 
 void read_mem_from_pos(void* dst, DWORD pos, DWORD length);
+void read_string_from_pos_s(void* dst, DWORD pos, DWORD max_length);
 DWORD read_dword_value_from_pos(DWORD pos);
 WORD read_word_value_from_pos(DWORD pos);
 BYTE read_byte_value_from_pos(DWORD pos);
@@ -189,8 +190,9 @@ typedef struct {
 									int					iMIDIPort;
 									int					iSequenceNumber;
 									struct {
-										BYTE			*pData;
-										DWORD			pData2;
+										//BYTE			*pData;
+										BYTE pData[256]; // 256 byte for meta events texts... (hope this is enough)
+										
 										} Text;
 									struct {
 										int				iBPM;
@@ -206,8 +208,7 @@ typedef struct {
 										int				iNom, iDenom;
 										} TimeSig;
 									struct {
-										BYTE			*pData; // delete!
-										DWORD			pData2;
+										BYTE			pData[256];
 										int				iSize;
 										} Sequencer;
 									} Data;
