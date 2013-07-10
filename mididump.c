@@ -397,7 +397,6 @@ int i=0;
 
 	// wait for user input before close
 	printf("Done! Press enter to exit...\n");
-	getch();
 
 	return 0;
 }
