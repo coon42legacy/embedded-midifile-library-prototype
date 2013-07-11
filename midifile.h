@@ -80,7 +80,6 @@ BYTE read_byte_value_from_pos(DWORD pos);
 // - coon
 
 #define MAX_MIDI_TRACKS			16 // default: 256 
-#define MAX_TRACK_POLYPHONY		 4 // 64
 
 /*
 ** MIDI structures, accessibly externably
@@ -88,32 +87,20 @@ BYTE read_byte_value_from_pos(DWORD pos);
 /*
 ** Internal Data Structures
 */
-typedef struct 	{
-	BYTE note, chn;
-	BYTE valid, p2;
-	DWORD end_pos;
-} MIDI_LAST_NOTE;
 
 typedef struct 	{
-	BYTE *ptr;
-	BYTE *pBase;
-	BYTE *pEnd;
-
 	DWORD ptr2;
 	DWORD pBase2;
 	DWORD pEnd2;
 
 
 	DWORD pos;
-	DWORD dt;
 	/* For Reading MIDI Files */
 	DWORD size;						/* size of whole iTrack */
 	/* For Writing MIDI Files */
-	DWORD iBlockSize;				/* max size of track */
 	BYTE iDefaultChannel;			/* use for write only */
 	BYTE last_status;				/* used for running status */
 
-	MIDI_LAST_NOTE LastNote[MAX_TRACK_POLYPHONY];
 } MIDI_FILE_TRACK;
 
 typedef struct 	{
@@ -149,7 +136,7 @@ typedef struct {
 					tMIDI_MSG	iImpliedMsg;
 
 					/* Raw data chunk */
-					BYTE *data;		/* dynamic data block */ // delete
+					BYTE *data;		/* dynamic data block */
 					DWORD data_sz;
 					
 					union {
@@ -191,7 +178,7 @@ typedef struct {
 									int					iSequenceNumber;
 									struct {
 										//BYTE			*pData;
-										BYTE pData[256]; // 256 byte for meta events texts... (hope this is enough)
+										BYTE pData[128]; // 128 byte for meta events texts... (hope this is enough)
 										
 										} Text;
 									struct {
@@ -208,7 +195,7 @@ typedef struct {
 										int				iNom, iDenom;
 										} TimeSig;
 									struct {
-										BYTE			pData[256];
+										BYTE			pData[128];
 										int				iSize;
 										} Sequencer;
 									} Data;

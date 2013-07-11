@@ -322,7 +322,7 @@ MIDI_END_POINT *p2 = (MIDI_END_POINT *)e2;
 	return p1->iEndPos-p2->iEndPos;
 }
 
-
+/*
 static BOOL	midiFileSyncTracks(_MIDI_FILE *_pMF, int iTrack1, int iTrack2)
 {
 int p1, p2;
@@ -340,9 +340,9 @@ int p1, p2;
 	
 	return TRUE;
 }
+*/
 
-
-static BOOL	midiFileClose(_MIDI_FILE *_pMF)
+BOOL midiFileClose(_MIDI_FILE *_pMF)
 {
 	_VAR_CAST;
 	if (!IsFilePtrValid(pMF))			return FALSE;
@@ -350,7 +350,7 @@ static BOOL	midiFileClose(_MIDI_FILE *_pMF)
 
 	if (pMF->pFile)
 		return fclose(pMF->pFile)?FALSE:TRUE;
-	free((void *)pMF);
+	// free((void *)pMF); // this is not on heap anymore. it's now on the stack
 	return TRUE;
 }
 
@@ -429,7 +429,6 @@ BOOL midiReadGetNextMessage(const _MIDI_FILE *_pMF, int iTrack, MIDI_MSG *pMsg)
 	pTrack->pos += pMsg->dt;
 	pMsg->dwAbsPos = pTrack->pos;
 
-	
 	bTmp[0] = read_byte_value_from_pos(pTrack->ptr2);
 	if(bTmp[0] & 0x80) /* Is this is sys message */
 	{
@@ -452,7 +451,8 @@ BOOL midiReadGetNextMessage(const _MIDI_FILE *_pMF, int iTrack, MIDI_MSG *pMsg)
 	pMsg->iLastMsgType = (tMIDI_MSG)pMsg->iType;
 
 	bTmp[0] = read_byte_value_from_pos(pTrack->ptr2);
-	pMsg->iLastMsgChnl = (BYTE)(bTmp[0] & 0x0f) + 1;
+
+	pMsg->iLastMsgChnl = (BYTE)((bTmp[0]     ) & 0x0f) + 1;
 
 	bTmp[0] = read_byte_value_from_pos(pMsgDataPtr2 + 0);
 	bTmp[1] = read_byte_value_from_pos(pMsgDataPtr2 + 1);
